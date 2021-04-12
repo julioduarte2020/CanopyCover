@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Created on Wed Mar 14 11:03:20 2018
 
@@ -13,6 +12,7 @@ import scipy.ndimage
 import math
 from sklearn.model_selection import StratifiedKFold
 from joblib import dump, load
+import math
 
 #########################
 # MODEL SELECTION
@@ -101,6 +101,13 @@ for train_index, test_index in skf.split(data, labels):
     specificity[cont] /= no_classes
     print('specificity: ' + str(specificity[cont])) 
     cont += 1
+
+print('accuracy_mean: ' + str(accuracy.mean()*100))
+print('accuracy_std: ' + str(accuracy.std()*100/math.sqrt(crossval_splits)))
+print('sensitivity_mean: ' + str(sensitivity.mean()*100))
+print('sensitivity_std: ' + str(sensitivity.std()*100/math.sqrt(crossval_splits)))
+print('specificity_mean: ' + str(specificity.mean()*100))
+print('specificity_std: ' + str(specificity.std()*100/math.sqrt(crossval_splits)))
 
 #########################
 # CLASSIFICATION
