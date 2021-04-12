@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """
 Created on Wed Mar 14 09:50:06 2018
 
@@ -102,6 +101,12 @@ for train_index, test_index in skf.split(data, labels):
     print('specificity: ' + str(specificity[cont])) 
     cont += 1
 
+print('accuracy_mean: ' + str(accuracy.mean()*100))
+print('accuracy_std: ' + str(accuracy.std()*100/math.sqrt(crossval_splits)))
+print('sensitivity_mean: ' + str(sensitivity.mean()*100))
+print('sensitivity_std: ' + str(sensitivity.std()*100/math.sqrt(crossval_splits)))
+print('specificity_mean: ' + str(specificity.mean()*100))
+print('specificity_std: ' + str(specificity.std()*100/math.sqrt(crossval_splits)))
 #########################
 # CLASSIFICATION
 #########################
@@ -227,6 +232,3 @@ for l in range(len(L)):
                      str(crown_cover) + '; ' + str(crown_porosity) + '; ' + \
                      str(clumping_index) + '; ' + str(LAI) + '\n')
 output.close()
-
-
-
