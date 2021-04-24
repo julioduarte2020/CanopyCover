@@ -1,3 +1,4 @@
+# -*- coding: utf-8 -*-
 """
 Created on Tue Mar 13 09:56:25 2018
 
@@ -8,7 +9,7 @@ seed(1)
 import tensorflow
 tensorflow.random.set_seed(2)
 import os
-import imageio
+from PIL import Image
 import spectral
 import numpy
 import keras
@@ -24,7 +25,7 @@ def getPatch(img,patch_dim,row,col):
     p2 = col + w
     if r1>=0 and p1>=0 and r2<img.shape[0] and p2<img.shape[1]:
         return img[r1:r2+1,p1:p2+1]
-    patch = numpy.zeros((patch_dim,patch_dim,3))
+    patch = numpy.zeros((patch_dim,patch_dim,3), dtype=numpy.float32)
     for r in range(-w,w+1):
         rp = row + r
         if rp < 0 : rp = abs(rp) - 1
@@ -39,11 +40,13 @@ def getPatch(img,patch_dim,row,col):
 #########################
 # MODEL SELECTION
 #########################
+root0 = 'D:/Escritorio/Corpoica/Canopy Attributes/'
 root = 'D:/Escritorio/Corpoica/Canopy Attributes/images/'
 root_in = root + 'input/'
 root_out = root + 'output/'
 patch_dim = 9 #patches of size 9x9
-L = os.listdir(root_in)     
+L = os.listdir(root_in)   
+L.sort()  
 cont = 0
 for l in range(len(L)):
     file = L[l]
@@ -51,18 +54,14 @@ for l in range(len(L)):
     if file_split[1] == '.gis':
         labelsFile = root_in + file
         local_labels = spectral.open_image(labelsFile).read_band(0)
-        image = file_split[0] + '.jpg'
-        imageFile = root_in + image
-        img = imageio.imread(imageFile)
         no_classes = int( local_labels.max() )
         for i in range(1, no_classes+1):
             (rows, cols)=(local_labels == i).nonzero()
             samples = len(rows)
             cont += samples
  
-data = numpy.zeros((cont,patch_dim,patch_dim,3))           
-labels = numpy.zeros((cont,1), dtype=numpy.uint8)            
-labels = labels.flatten()
+data = numpy.zeros((cont,patch_dim,patch_dim,3), dtype=numpy.float32)           
+labels = numpy.zeros(cont, dtype=numpy.uint8)            
 
 cont = 0            
 for l in range(len(L)):
@@ -73,7 +72,7 @@ for l in range(len(L)):
         local_labels = spectral.open_image(labelsFile).read_band(0)
         image = file_split[0] + '.jpg'
         imageFile = root_in + image
-        img = imageio.imread(imageFile)
+        img = numpy.asarray( Image.open(imageFile), dtype=numpy.float32 )
         no_classes = int( local_labels.max() )
         for i in range(1, no_classes+1):
             (rows, cols)=(local_labels == i).nonzero()
@@ -144,13 +143,13 @@ for train_index, test_index in skf.split(data, labels):
                   optimizer=optim,
                   metrics=['accuracy'])
     #Add checkpoint to get the best result
-    checkpointer = keras.callbacks.ModelCheckpoint(filepath=root + 'CNN.hdf5', verbose=1, 
+    checkpointer = keras.callbacks.ModelCheckpoint(filepath=root0 + 'CNN.hdf5', verbose=1, 
                                                    save_best_only=True)
     #Fit model
     model.fit(train_data, train_labels, epochs=5, batch_size=100, 
               validation_split=0.2, callbacks=[checkpointer])
     
-    model = keras.models.load_model(root + 'CNN.hdf5')
+    model = keras.models.load_model(root0 + 'CNN.hdf5')
     
     #Compute scores
     pred = model.predict_classes(test_data)
@@ -230,41 +229,51 @@ model.compile(loss='categorical_crossentropy',
               optimizer=optim,
               metrics=['accuracy'])
 #Add checkpoint to get the best result
-checkpointer = keras.callbacks.ModelCheckpoint(filepath=root + 'CNN.hdf5', verbose=1, 
+checkpointer = keras.callbacks.ModelCheckpoint(filepath=root0 + 'CNN.hdf5', verbose=1, 
                                                save_best_only=True)
 #Fit model
 labels = keras.utils.to_categorical(labels, num_classes=no_classes)
 model.fit(data, labels, epochs=5, batch_size=100, 
           validation_split=0.2, callbacks=[checkpointer])
 
-model = keras.models.load_model(root + 'CNN.hdf5')
+model = keras.models.load_model(root0 + 'CNN.hdf5')
     
 #######################
 # CANOPY ATTRIBUTES
 #######################
+data = None
 output = open(root_out + 'Canopy Attributes_CNN.csv', 'w')
 output.write('image; gap_fraction; large_gap_fraction; foliage cover; crown cover; crown porosity; '  
              'clumping index; LAI\n')
-L = os.listdir(root_in)     
 for l in range(len(L)):
     file = L[l]
     file_split = os.path.splitext(file)
     if file_split[1] == '.jpg':
         #Performs classification on all the images
         imageFile = root_in + file
-        img = numpy.asarray(imageio.imread(imageFile), dtype=numpy.float32)
+        img = numpy.asarray(Image.open(imageFile), dtype=numpy.float32)
         rows = img.shape[0]
         cols = img.shape[1]
         img /= 255
-        patches = numpy.zeros((rows*cols,patch_dim,patch_dim,3))
+        patches = numpy.zeros((rows*cols,patch_dim,patch_dim,3), dtype=numpy.float32)
         p = 0
         for r in range(rows):
             for c in range(cols):
                 patches[p,:,:,:] = getPatch(img,patch_dim,r,c)
                 p += 1
-        classify = model.predict_classes(patches, batch_size=100)
+        classify = model.predict_classes(patches, batch_size=100) 
         classify = numpy.asarray( classify.reshape((rows,cols)), dtype=numpy.uint8)
-        imageio.imsave(root_out + file_split[0] + '_CNN_class.tif',classify)
+        image_array = numpy.zeros((rows,cols,3), dtype=numpy.uint8)
+        (u, v) = (classify == 0).nonzero()  # Trunk 
+        if len(u)>0: #Yellow
+            image_array[u,v,1] = 127    #Green
+            image_array[u,v,0] = 127    #Red
+        (u, v) = (classify == 1).nonzero()  # Sky 
+        if len(u)>0: image_array[u,v,2] = 127   #Blue
+        (u, v) = (classify == 2).nonzero()  # Leaves 
+        if len(u)>0: image_array[u,v,1] = 127   #Blue
+        image = Image.fromarray(image_array)
+        image.save(root_out + file_split[0] + '_CNN_class.tif')
         
         #Compute Canopy Attributes
         sky = numpy.asarray( numpy.zeros((rows,cols)), dtype=numpy.uint8 )
