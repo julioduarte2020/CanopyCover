@@ -72,8 +72,7 @@ for train_index, test_index in skf.split(data, labels):
     train_data, test_data = data[train_index], data[test_index]
     train_labels, test_labels = labels[train_index], labels[test_index]
     #Random Forest
-    model = RandomForestClassifier(n_estimators=100, class_weight='balanced',
-                                   random_state=0, bootstrap=True, verbose=5)
+    model = RandomForestClassifier(n_estimators=100, random_state=0, verbose=5)
     model.fit(train_data, train_labels)  
     
     #Compute scores
@@ -110,8 +109,7 @@ print('specificity_std: ' + str(specificity.std()*100/math.sqrt(crossval_splits)
 #########################
 # CLASSIFICATION
 #########################
-model = RandomForestClassifier(n_estimators=100, class_weight='balanced',
-                               random_state=0, bootstrap=True, verbose=5)
+model = RandomForestClassifier(n_estimators=100, random_state=0, verbose=5)
 model.fit(data, labels)  
 dump(model, 'D:/Escritorio/Corpoica/Canopy Attributes/RandomForest.joblib')
     
