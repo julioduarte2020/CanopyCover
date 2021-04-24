@@ -1,10 +1,11 @@
+# -*- coding: utf-8 -*-
 """
 Created on Wed Mar 14 09:50:06 2018
 
 @author: jmduarte
 """
 import os
-import imageio
+from PIL import Image
 import spectral
 import numpy
 from sklearn.neighbors import KNeighborsClassifier
@@ -27,9 +28,6 @@ for l in range(len(L)):
     if file_split[1] == '.gis':
         labelsFile = root_in + file
         local_labels = spectral.open_image(labelsFile).read_band(0)
-        image = file_split[0] + '.jpg'
-        imageFile = root_in + image
-        img = imageio.imread(imageFile)
         no_classes = int( local_labels.max() )
         for i in range(1, no_classes+1):
             (rows, cols)=(local_labels == i).nonzero()
@@ -49,7 +47,7 @@ for l in range(len(L)):
         local_labels = spectral.open_image(labelsFile).read_band(0)
         image = file_split[0] + '.jpg'
         imageFile = root_in + image
-        img = imageio.imread(imageFile)
+        img = numpy.asarray( Image.open(imageFile), dtype=numpy.float32 )
         no_classes = int( local_labels.max() )
         for i in range(1, no_classes+1):
             (rows, cols)=(local_labels == i).nonzero()
@@ -110,7 +108,7 @@ print('specificity_std: ' + str(specificity.std()*100/math.sqrt(crossval_splits)
 #########################
 # CLASSIFICATION
 #########################
-model = KNeighborsClassifier(n_neighbors=5, leaf_size=100, n_jobs=40)
+model = KNeighborsClassifier(n_neighbors=5, leaf_size=100)
 model.fit(data, labels)  
 dump(model, 'D:/Escritorio/Corpoica/Canopy Attributes/KNN.joblib')
 
@@ -128,14 +126,24 @@ for l in range(len(L)):
     if file_split[1] == '.jpg':
         #Performs classification on all the images
         imageFile = root_in + file
-        img = imageio.imread(imageFile)
+        img = numpy.asarray(Image.open(imageFile), dtype=numpy.float32)
         rows = img.shape[0]
         cols = img.shape[1]
         img_flat = numpy.asarray(img.reshape(rows*cols,3), dtype=numpy.float32)
         img_flat /= 255
         classify = model.predict(img_flat)
         classify = numpy.asarray( classify.reshape((rows,cols)), dtype=numpy.uint8)
-        imageio.imsave(root_out + file_split[0] + '_KNN_class.tif',classify)
+        image_array = numpy.zeros((rows,cols,3), dtype=numpy.uint8)
+        (u, v) = (classify == 0).nonzero()  # Trunk 
+        if len(u)>0: #Yellow
+            image_array[u,v,1] = 127    #Green
+            image_array[u,v,0] = 127    #Red
+        (u, v) = (classify == 1).nonzero()  # Sky 
+        if len(u)>0: image_array[u,v,2] = 127   #Blue
+        (u, v) = (classify == 2).nonzero()  # Leaves 
+        if len(u)>0: image_array[u,v,1] = 127   #Blue
+        image = Image.fromarray(image_array)
+        image.save(root_out + file_split[0] + '_KNN_class.tif')
         
         #Compute Canopy Attributes
         sky = numpy.asarray( numpy.zeros((rows,cols)), dtype=numpy.uint8 )
