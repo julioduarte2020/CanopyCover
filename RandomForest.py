@@ -1,10 +1,11 @@
+# -*- coding: utf-8 -*-
 """
 Created on Wed Mar 14 11:03:20 2018
 
 @author: jmduarte
 """
 import os
-import imageio
+from PIL import Image
 import spectral
 import numpy
 from sklearn.ensemble import RandomForestClassifier
@@ -12,7 +13,6 @@ import scipy.ndimage
 import math
 from sklearn.model_selection import StratifiedKFold
 from joblib import dump, load
-import math
 
 #########################
 # MODEL SELECTION
@@ -28,16 +28,13 @@ for l in range(len(L)):
     if file_split[1] == '.gis':
         labelsFile = root_in + file
         local_labels = spectral.open_image(labelsFile).read_band(0)
-        image = file_split[0] + '.jpg'
-        imageFile = root_in + image
-        img = imageio.imread(imageFile)
         no_classes = int( local_labels.max() )
         for i in range(1, no_classes+1):
             (rows, cols)=(local_labels == i).nonzero()
             samples = len(rows)
             cont += samples
  
-data = numpy.zeros((cont,3))           
+data = numpy.zeros((cont,3), dtype=numpy.float32)           
 labels = numpy.zeros((cont,1), dtype=numpy.uint8)            
 labels = labels.flatten()
 
@@ -50,7 +47,7 @@ for l in range(len(L)):
         local_labels = spectral.open_image(labelsFile).read_band(0)
         image = file_split[0] + '.jpg'
         imageFile = root_in + image
-        img = imageio.imread(imageFile)
+        img = numpy.asarray( Image.open(imageFile), dtype=numpy.float32 )
         no_classes = int( local_labels.max() )
         for i in range(1, no_classes+1):
             (rows, cols)=(local_labels == i).nonzero()
@@ -75,7 +72,8 @@ for train_index, test_index in skf.split(data, labels):
     train_data, test_data = data[train_index], data[test_index]
     train_labels, test_labels = labels[train_index], labels[test_index]
     #Random Forest
-    model = RandomForestClassifier(n_estimators=100,verbose=5,n_jobs=20, random_state=123)
+    model = RandomForestClassifier(n_estimators=100, class_weight='balanced',
+                                   random_state=0, bootstrap=True, verbose=5)
     model.fit(train_data, train_labels)  
     
     #Compute scores
@@ -112,32 +110,42 @@ print('specificity_std: ' + str(specificity.std()*100/math.sqrt(crossval_splits)
 #########################
 # CLASSIFICATION
 #########################
-model = RandomForestClassifier(n_estimators=100,verbose=5, n_jobs=20, random_state=123)
+model = RandomForestClassifier(n_estimators=100, class_weight='balanced',
+                               random_state=0, bootstrap=True, verbose=5)
 model.fit(data, labels)  
 dump(model, 'D:/Escritorio/Corpoica/Canopy Attributes/RandomForest.joblib')
     
 #######################
 # CANOPY ATTRIBUTES
 #######################
-#model = load('D:/Escritorio/Corpoica/Canopy Attributes/RandomForest.joblib')
+model = load('D:/Escritorio/Corpoica/Canopy Attributes/RandomForest.joblib')
 output = open(root_out + 'Canopy Attributes_Random Forest.csv', 'w')
 output.write('image; gap_fraction; large_gap_fraction; foliage cover; '
              'crown cover; crown porosity; clumping index; LAI\n')
-L = os.listdir(root_in)     
 for l in range(len(L)):
     file = L[l]
     file_split = os.path.splitext(file)
     if file_split[1] == '.jpg':
         #Performs classification on all the images
         imageFile = root_in + file
-        img = imageio.imread(imageFile)
+        img = numpy.asarray(Image.open(imageFile), dtype=numpy.float32)
         rows = img.shape[0]
         cols = img.shape[1]
         img_flat = numpy.asarray(img.reshape(rows*cols,3), dtype=numpy.float32)
         img_flat /= 255
         classify = model.predict(img_flat)
         classify = numpy.asarray( classify.reshape((rows,cols)), dtype=numpy.uint8)
-        imageio.imsave(root_out + file_split[0] + '_RandomForest_class.tif',classify)
+        image_array = numpy.zeros((rows,cols,3), dtype=numpy.uint8)
+        (u, v) = (classify == 0).nonzero()  # Trunk 
+        if len(u)>0: #Yellow
+            image_array[u,v,1] = 127    #Green
+            image_array[u,v,0] = 127    #Red
+        (u, v) = (classify == 1).nonzero()  # Sky 
+        if len(u)>0: image_array[u,v,2] = 127   #Blue
+        (u, v) = (classify == 2).nonzero()  # Leaves 
+        if len(u)>0: image_array[u,v,1] = 127   #Blue
+        image = Image.fromarray(image_array)
+        image.save(root_out + file_split[0] + '_RandomForest_class.tif')
         
         #Compute Canopy Attributes
         sky = numpy.asarray( numpy.zeros((rows,cols)), dtype=numpy.uint8 )
