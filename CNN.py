@@ -177,40 +177,30 @@ print('specificity_std: ' + str(specificity.std()*100/math.sqrt(crossval_splits)
 #Convolutional Neural Network
 # create model
 kernel1 = 3
-kernel2 = 5
-no_filters1 = 20
-no_filters2 = 40
+kernel2 = 3
+no_filters1 = 32
+no_filters2 = 64
 model = keras.models.Sequential()
 #First Convolutional Layer
 model.add(keras.layers.Conv2D(no_filters1, kernel1,
                               input_shape=(patch_dim,patch_dim,3),
                               padding='same'))
-model.add(keras.layers.BatchNormalization())
-model.add(keras.layers.Dropout(0.2))
 model.add(keras.layers.Activation('relu'))  
+model.add(keras.layers.BatchNormalization())
 #Second Convolutional Layer
 model.add(keras.layers.Conv2D(no_filters1, kernel1, padding='same'))
-model.add(keras.layers.BatchNormalization())
-model.add(keras.layers.Dropout(0.2))
-model.add(keras.layers.Activation('relu'))  
+model.add(keras.layers.Activation('relu'))
+model.add(keras.layers.BatchNormalization())  
 model.add(keras.layers.MaxPooling2D(pool_size=(2,2)))
 
 model.add(keras.layers.Flatten())
 #First MLP Layer
 no_nodes_layer1 = int(model.output_shape[1] / 2)
 model.add(keras.layers.Dense(units=no_nodes_layer1))
-model.add(keras.layers.BatchNormalization())
-model.add(keras.layers.Dropout(0.2))
 model.add(keras.layers.Activation('relu')) 
-#Second MLP layer
-no_nodes_layer2 = int(no_nodes_layer1 / 2)
-model.add(keras.layers.Dense(units=no_nodes_layer2))
 model.add(keras.layers.BatchNormalization())
-model.add(keras.layers.Dropout(0.2))
-model.add(keras.layers.Activation('relu')) 
 #Output layer
 model.add(keras.layers.Dense(units=no_classes))
-model.add(keras.layers.BatchNormalization())
 model.add(keras.layers.Activation('softmax'))
 # Compile model
 #optim = keras.optimizers.Adamax(lr=0.01)
